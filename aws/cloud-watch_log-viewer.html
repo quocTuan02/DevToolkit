@@ -23,6 +23,22 @@
           --debug: #a78bfa;
         }
 
+        body.light {
+          --bg: #f0f2f5;
+          --surface: #ffffff;
+          --surface2: #f4f6fa;
+          --border: #dde1eb;
+          --accent: #00957a;
+          --accent2: #e53e3e;
+          --accent3: #b7860a;
+          --text: #1a1d24;
+          --text-muted: #7a8699;
+          --info: #2563eb;
+          --warn: #c27803;
+          --error: #dc2626;
+          --debug: #6d28d9;
+        }
+
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
@@ -308,7 +324,7 @@
         th.sorted .sort-icon { opacity: 1; color: var(--accent); }
 
         tbody tr {
-          border-bottom: 1px solid rgba(42, 45, 53, 0.5);
+          border-bottom: 1px solid var(--border);
           transition: background 0.1s;
           cursor: pointer;
         }
@@ -442,6 +458,24 @@
         ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
+        .theme-toggle {
+          background: var(--surface2);
+          border: 1px solid var(--border);
+          color: var(--text-muted);
+          width: 36px;
+          height: 36px;
+          border-radius: 8px;
+          cursor: pointer;
+          font-size: 16px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s;
+          flex-shrink: 0;
+        }
+
+        .theme-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
         .drop-zone {
           border: 2px dashed var(--border);
           border-radius: 8px;
@@ -484,6 +518,7 @@
             <div class="stat-value" id="filteredCount">0</div>
             <div class="stat-label">Filtered</div>
         </div>
+        <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" title="Toggle theme">🌙</button>
     </div>
 </div>
 
@@ -534,6 +569,19 @@
 
 
 <script>
+    // Theme
+    const savedTheme = localStorage.getItem('cw-theme') || 'dark';
+    if (savedTheme === 'light') {
+      document.body.classList.add('light');
+      document.getElementById('themeToggle').textContent = '☀️';
+    }
+
+    function toggleTheme() {
+      const isLight = document.body.classList.toggle('light');
+      document.getElementById('themeToggle').textContent = isLight ? '☀️' : '🌙';
+      localStorage.setItem('cw-theme', isLight ? 'light' : 'dark');
+    }
+
     let allLogs = [];
     let filteredLogs = [];
     let currentPage = 1;
