@@ -306,6 +306,7 @@
   tbody tr:hover td.key-cell { background: var(--surface2); }
 
   td.diff-cell { background: var(--surface2); color: var(--text-dim); font-size: 11px; max-width: 300px; }
+  td.same-hidden { color: transparent; user-select: none; }
 
   td.val-a { background: var(--diff-a); }
   td.val-b { background: var(--diff-b); }
@@ -1001,7 +1002,8 @@
           }
 
           if (onlyDiff && !changed) {
-            td.innerHTML = '<span style="color:var(--text-dim);font-size:10px">═</span>';
+            td.classList.add('same-hidden');
+            td.textContent = val || 'NULL';
           } else if (!val) {
             td.classList.add('null-val');
             td.textContent = 'NULL';
