@@ -892,6 +892,16 @@
     });
 
     filteredRows = rows;
+
+    if (sortCol !== -1) {
+      const h = headers[sortCol];
+      filteredRows.sort((a, b) => {
+        const va = a[h] || '';
+        const vb = b[h] || '';
+        return sortAsc ? va.localeCompare(vb) : vb.localeCompare(va);
+      });
+    }
+
     currentPage = 1;
     renderTable();
     renderPagination();
