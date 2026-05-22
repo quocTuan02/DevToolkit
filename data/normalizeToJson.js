@@ -14,245 +14,256 @@
  * @param {string} INPUT - Chuỗi đầu vào cần chuẩn hóa
  * @returns {string|null} - Chuỗi JSON hợp lệ, hoặc null nếu không thể parse
  */
-function normalizeToJson(INPUT) {
-  // Trả về null ngay nếu input rỗng hoặc chỉ có khoảng trắng
-  if (!INPUT || INPUT.trim() === '') return null;
-  var s = INPUT.trim();
 
-  // ─── XỬ LÝ ĐẶC BIỆT: JAN Code List ───────────────────────────────────────
-  // Format: [jan1, jan2, ...]<sortBy><descending>
-  // Ví dụ:  [4910024340432, 4910024340524]0true
-  //      -> {"janCodes":[4910024340432,...], "sortBy":0, "descending":true}
-  var janListMatch = s.match(/^\[([^\]]+)\](\d+)(true|false)$/);
-  if (janListMatch) {
-    var codes = janListMatch[1].split(',').map(function(v) {
-      v = v.trim();
-      // Nếu là số nguyên thì giữ nguyên, ngược lại bọc trong JSON string
-      return /^\d+$/.test(v) ? parseInt(v) : JSON.stringify(v);
-    });
-    return '{"janCodes":[' + codes.join(',') + '],"sortBy":' + parseInt(janListMatch[2]) + ',"descending":' + janListMatch[3] + '}';
-  }
+// ─── REGEX CONSTANTS ──────────────────────────────────────────────────────────
+// -- Regex chỉ dùng trong .test() / .match() (không /g) --
+const RE_JAN_LIST           = /^\[([^\]]+)](\d+)(true|false)$/;
+const RE_JUNK_BRACKET       = /^\[[^\]]*]\w+/;
+const RE_JUNK_BRACKET_Q     = /^'\[[^\]]*]\w+'$/;
+const RE_CLASS_PREFIX_BRACE = /^[A-Za-z][\w.$]*{/;
+const RE_CLASS_PREFIX_SQ    = /^[A-Za-z][\w.$]*\s+\[/;
+const RE_OUTER_PAREN        = /^[A-Za-z][\w.$]*\((.+)\)$/s;
+const RE_CLOSE_PAREN_END    = /\)$/;
+const RE_UNCLOSED_SQ_END    = /='([^']*)}$/;
+const RE_IS_INTEGER         = /^\d+$/;
+const RE_IS_ONLY_DIGITS     = /^-?\d+$/;
+const RE_IS_VALID_NUMBER    = /^-?[1-9]\d*(\.\d+)?$/;
+const RE_IS_FULL_NUMBER     = /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/;
+const RE_STRIP_COLON_PREFIX = /^:\s*/;
 
-  // ─── LOẠI BỎ INPUT RÁC ────────────────────────────────────────────────────
-  // Các pattern dạng [...]word không phải JAN list → không thể parse
-  if (/^\[[^\]]*\]\w+/.test(s)) return null;
-  if (/^'\[[^\]]*\]\w+'$/.test(s)) return null;
+// -- Regex /g — dùng với .replaceAll() --
+const RE_NESTED_BRACE       = /[A-Za-z][\w.$]*{/g;
+const RE_NESTED_PAREN       = /[A-Za-z][\w.$]*\(/g;
+const RE_CLOSE_PAREN_MID    = /\)(?=\s*[,}\]])/g;
+const RE_DOUBLE_QUOTE_CSV   = /""([^"]+)""/g;
+const RE_NEWLINE_COMMA      = /([}\]"0-9truefalsn])\s*\n\s*(")/g;
+const RE_DOUBLE_SQ          = /([^=])''([,}])/g;
+const RE_ARRAY_IN_SQ        = /(\w+)='\[(.+)]'(?=\s*[,}])/gs;
+const RE_UNCLOSED_SQ_1      = /='([^']*)(?=,\s*\w+=')/g;
+const RE_UNCLOSED_SQ_2      = /='([^'=,}]*)(?=,\s*\w+=)/g;
+const RE_LEADING_COMMA      = /{\s*,\s*/g;
+const RE_MISSING_COMMA_SQ   = /'([^']*)'(\s*)(\w+=)/g;
+const RE_SINGLE_QUOTED      = /'([^']*)'/g;
+const RE_KEY_EQUALS         = /(?<!["\w])[A-Za-z_]\w*=/g;
+const RE_KEY_COLON          = /(?<!["\w])[A-Za-z_]\w*\s*:/g;
+const RE_SCALAR_MULTI       = /"([^"]+)":\s*((?:[^"[{,\]}\n]+,\s*)+[^"[{,\]}\n]+)(?=\s*,\s*")/g;
+const RE_DATETIME_VAL       = /:\s*([A-Za-z][\w :]+)(?=\s*[,}])/g;
+const RE_LEADING_ZERO_VAL   = /:\s*0\w[\w\s]*?(?=\s*[,}])/g;
+const RE_SPACED_VAL         = /:\s*\w[\w-]*(?:\s+\w[\w-]*)*(?=\s*[,}])/g;
+const RE_EMPTY_VAL          = /:\s*(?=[,}\]])/g;
+const RE_CATCHALL_VAL       = /:\s*([^",[{\]}\s][^",[{\]}\n]*)(?=\s*[,}])/g;
+const RE_UNQUOTED_STR       = /:\s*([A-Za-z\u3000-\u9FFF][\w\u3000-\u9FFF-]*)/g;
+const RE_INNER_ARRAY        = /\[([^[\]]*)\]/g;
+const RE_TRAILING_COMMA     = /,\s*([}\]])/g;
+const RE_WHITESPACE         = /[\t\r\n]+/g;
+const RE_COMMA_SPACES       = /\s*,\s*/g;
 
-  // ─── BƯỚC 0: Loại bỏ tiền tố tên class ───────────────────────────────────
-  // Java/Kotlin toString() thường có dạng: ClassName{...} hoặc ClassName(...)
-  // Ví dụ: Person{name=John} -> {name=John}
-  s = s.replace(/^[A-Za-z][A-Za-z0-9_.$]*\{/, '{');
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
 
-  // Dạng: ClassName [...] -> {...}
-  if (/^[A-Za-z][A-Za-z0-9_.$]*\s+\[/.test(s)) {
-    s = s.replace(/^[A-Za-z][A-Za-z0-9_.$]*\s+\[/, '{');
-    if (s.endsWith(']')) s = s.slice(0, -1) + '}';
-  }
+/** key= hoặc key: -> "key": */
+function extractKey(match) {
+  return '"' + match.replace(/[=:\s]+$/, '') + '":';
+}
 
-  // Dạng: ClassName(...) -> {...}
-  var outerParen = s.match(/^[A-Za-z][A-Za-z0-9_.$]*\((.+)\)$/s);
-  if (outerParen) s = '{' + outerParen[1] + '}';
-
-  // ─── BƯỚC 1: Chuẩn hóa class lồng nhau ───────────────────────────────────
-  // Xử lý đệ quy các class lồng nhau bên trong object
-  // Ví dụ: {address=Address{city=Hanoi}} -> {address={city=Hanoi}}
-  // Lặp cho đến khi không còn thay đổi (xử lý nhiều lớp lồng nhau)
-  var prev;
-  do {
-    prev = s;
-    s = s.replace(/[A-Za-z][A-Za-z0-9_.$]*\{/g, '{');  // ClassName{ -> {
-    s = s.replace(/[A-Za-z][A-Za-z0-9_.$]*\(/g, '{');  // ClassName( -> {
-    s = s.replace(/\)(?=\s*[,}\]])/g, '}');             // ) trước , } ] -> }
-    s = s.replace(/\)$/, '}');                           // ) cuối chuỗi -> }
-  } while (s !== prev);
-
-  // ─── BƯỚC 1b: Sửa double-quote kép trong CSV ──────────────────────────────
-  // Ví dụ: ""content"" -> "content"
-  s = s.replace(/""([^"]+)""/g, '"$1"');
-
-  // ─── BƯỚC 1c: Thêm dấu phẩy thiếu giữa các field phân tách bằng newline ──
-  // Ví dụ: "value"\n"key" -> "value",\n"key"
-  s = s.replace(/([}\]"0-9truefalsn])\s*\n\s*(")/g, '$1,\n$2');
-
-  // ─── SỬA LỖI: Các trường hợp đặc biệt ────────────────────────────────────
-
-  // Dấu nháy đơn thừa sau null: =null' -> =null
-  s = s.replace(/=null'/g, '=null');
-
-  // Double single-quote sau value: val'' -> val'  (chỉ trước , hoặc })
-  s = s.replace(/([^=])''([,}])/g, '$1\'$2');
-
-  // key='[content]' -> key:[content]  (array bị bọc trong single-quote)
-  // Phải xử lý TRƯỚC bước loại bỏ ]'
-  s = s.replace(/([A-Za-z_][A-Za-z0-9_]*)='\[(.+)\]'(?=\s*[,}])/gs, '"$1":[$2]');
-
-  // Dấu nháy đơn thừa sau đóng array: ]' -> ]
-  s = s.replace(/\]'/g, ']');
-
-  // ─── SỬA LỖI: Single-quote chưa đóng ─────────────────────────────────────
-  // Ví dụ: dateOfCompany='20230701, nextKey=' -> dateOfCompany='20230701', nextKey='
-  // Lặp greedy để xử lý value có dấu phẩy bên trong
-  var prevR;
-  do {
-    prevR = s;
-    // Trường hợp 1: theo sau bởi key=' pattern
-    s = s.replace(/='([^']*)(?=,\s*[A-Za-z_][A-Za-z0-9_]*=')/g, "='$1'");
-  } while (s !== prevR);
-  do {
-    prevR = s;
-    // Trường hợp 2: theo sau bởi key= pattern (không có nháy đơn)
-    s = s.replace(/='([^'=,}]*)(?=,\s*[A-Za-z_][A-Za-z0-9_]*=)/g, "='$1'");
-  } while (s !== prevR);
-
-  // Single-quote chưa đóng ở cuối object: ='value} -> ='value'}
-  s = s.replace(/='([^']*)}$/, "='$1'}");
-
-  // ─── SỬA LỖI: Chuỗi bị truncate (thiếu dấu đóng ngoặc) ──────────────────
-  // Đếm độ sâu ngoặc { } và bổ sung } còn thiếu ở cuối
-  var t = s.trim();
-  if (t.startsWith('{') && !t.endsWith('}')) {
-    var depth = 0;
-    for (var ci = 0; ci < t.length; ci++) {
-      if (t[ci] === '{') depth++;
-      else if (t[ci] === '}') depth--;
-    }
-    if (depth > 0) s = t + '}'.repeat(depth);
-  }
-
-  // Dấu phẩy thừa ở đầu object: {, key -> { key
-  s = s.replace(/\{\s*,\s*/g, '{');
-
-  // Thiếu dấu phẩy giữa các field: 'val'key= -> 'val', key=
-  // Chỉ kích hoạt khi dấu nháy đóng đứng liền trước key= (không có dấu phẩy)
-  s = s.replace(/'([^']*)'(\s*)([A-Za-z_][A-Za-z0-9_]*=)/g, "'$1',$2$3");
-
-  // ─── BƯỚC 2: Chuẩn hóa whitespace trong single-quoted values ─────────────
-  // Loại bỏ tab, newline; chuẩn hóa khoảng trắng quanh dấu phẩy
-  s = s.replace(/'([^']*)'/g, function(_, inner) {
-    return "'" + inner.replace(/[\t\r\n]+/g, '').replace(/\s*,\s*/g, ',').trim() + "'";
+/** Quote phần tử chưa có quote trong array — tách ra ngoài tránh S2004 */
+function quoteArrayElements(match, content) {
+  if (content.includes('{') || content.includes('[')) return match;
+  const fixed = content.split(/,\s*/).map(function(p) {
+    const t = p.trim();
+    if (!t) return 'null';
+    if (t.startsWith('"') || t === 'null' || t === 'true' || t === 'false') return t;
+    if (RE_IS_VALID_NUMBER.test(t) || t === '0') return t;
+    return '"' + t + '"';
   });
+  return '[' + fixed.join(', ') + ']';
+}
 
-  // ─── BƯỚC 3: Chuyển single-quote thành double-quote ──────────────────────
-  // 'value' -> "value"
-  s = s.replace(/'([^']*)'/g, '"$1"');
+/** Wrap scalar value: số/literal giữ nguyên, string bọc double-quote */
+function wrapScalarValue(raw) {
+  const v = raw.trim();
+  if (v === 'null' || v === 'true' || v === 'false') return ':' + v;
+  if (RE_IS_FULL_NUMBER.test(v)) return ':' + v;
+  if (v.startsWith('"')) return ':' + v;
+  return ':"' + v + '"';
+}
 
-  // ─── BƯỚC 4: Thêm quote cho key dạng key= ────────────────────────────────
-  // Ví dụ: name=John -> "name":John
-  s = s.replace(/(?<!["\w])([A-Za-z_][A-Za-z0-9_]*)=/g, '"$1":');
+/** Datetime/text value -> JSON string, giữ nguyên số và literal */
+function wrapDatetimeVal(match, val) {
+  const v = val.trim();
+  if (v === 'null' || v === 'true' || v === 'false') return ':' + v;
+  if (RE_IS_ONLY_DIGITS.test(v)) return ':' + v;
+  return ':"' + v + '"';
+}
 
-  // Thêm quote cho key dạng key: (chưa có quote)
-  // Ví dụ: {type: book} -> {"type": book}
-  s = s.replace(/(?<!["\w])([A-Za-z_][A-Za-z0-9_]*)\s*:/g, function(match, key) {
-    return '"' + key + '":';
+/** Scalar multi-value -> JSON array */
+function wrapScalarMulti(match, key, vals) {
+  if (!vals.includes(',')) return match;
+  const parts = vals.split(',').map(function(v) {
+    const val = v.trim();
+    if (!val) return null;
+    if (RE_IS_VALID_NUMBER.test(val) || val === '0') return val;
+    if (val === 'null' || val === 'true' || val === 'false') return val;
+    if (val.startsWith('"')) return val;
+    return '"' + val + '"';
+  }).filter(function(val) { return val !== null; });
+  return '"' + key + '":[' + parts.join(', ') + ']';
+}
+
+/**
+ * Xử lý JAN code list: [c1,c2,...]<sortBy><descending>
+ * @returns {string|null} JSON string nếu khớp, null nếu không
+ */
+function tryParseJanList(s) {
+  const m = s.match(RE_JAN_LIST);
+  if (!m) return null;
+  const codes = m[1].split(',').map(function(v) {
+    const t = v.trim();
+    return RE_IS_INTEGER.test(t) ? Number.parseInt(t, 10) : JSON.stringify(t);
   });
-
-  // ─── BƯỚC 5: Xử lý giá trị scalar nhiều phần tử (trước bước leading-zero) ─
-  // Ví dụ: "tags": foo, bar, baz, "next" -> "tags": ["foo", "bar", "baz"], "next"
-  s = s.replace(
-    /"([^"]+)":\s*((?:[^"\[{,\]}\n]+,\s*)+[^"\[{,\]}\n]+)(?=\s*,\s*")/g,
-    function(match, key, vals) {
-      if (!vals.includes(',')) return match;
-      var parts = vals.split(',').map(function(v) {
-        v = v.trim(); if (!v) return null;
-        if (/^-?[1-9]\d*(\.\d+)?$/.test(v) || v === '0') return v;      // số
-        if (v === 'null' || v === 'true' || v === 'false') return v;      // literal
-        if (v.startsWith('"')) return v;                                   // đã có quote
-        return '"' + v + '"';                                              // bọc string
-      }).filter(function(v) { return v !== null; });
-      return '"' + key + '":[' + parts.join(', ') + ']';
-    }
+  return (
+    '{"janCodes":[' + codes.join(',') +
+    '],"sortBy":' + Number.parseInt(m[2], 10) +
+    ',"descending":' + m[3] + '}'
   );
+}
 
-  // ─── BƯỚC 6b: Xử lý giá trị datetime (trước bước leading-zero) ───────────
-  // Phải xử lý trước để tránh hỏng các thành phần giờ phút giây
-  // Ví dụ: currentDate=Thu Apr 27 12:48:04 JST 2023
-  //     -> "currentDate":"Thu Apr 27 12:48:04 JST 2023"
-  s = s.replace(/:\s*([A-Za-z][A-Za-z0-9 :]+)(?=\s*[,}])/g, function(match, val) {
-    val = val.trim();
-    if (val === 'null' || val === 'true' || val === 'false') return ':' + val;
-    if (/^-?\d+$/.test(val)) return ':' + val;
-    return ':"' + val + '"';
-  });
+/**
+ * Loại bỏ tiền tố tên class Java/Kotlin và chuẩn hóa class lồng nhau.
+ * Person{...} -> {...}  |  Address{city=Hanoi} -> {city=Hanoi}
+ */
+function normalizeClassPrefixes(s) {
+  let result = s.replace(RE_CLASS_PREFIX_BRACE, () => '{');
 
-  // ─── BƯỚC 6: Xử lý giá trị bắt đầu bằng số 0 ────────────────────────────
-  // Các mã có leading zero, hex-style ID phải giữ nguyên dạng string
-  // Ví dụ: code=01234 -> "code":"01234"
-  s = s.replace(/:\s*(0[A-Za-z0-9][\w\s]*?)(?=\s*[,}])/g, function(m, v) {
-    return ':"' + v.trim() + '"';
-  });
-
-  // ─── BƯỚC 7: Xử lý giá trị có khoảng trắng bên trong ────────────────────
-  // Ví dụ: code=XSC7     1 -> "code":"XSC7 1"
-  s = s.replace(
-    /:\s*([A-Za-z0-9][A-Za-z0-9_\-]*(?:\s+[A-Za-z0-9][A-Za-z0-9_\-]*)*)(?=\s*[,}])/g,
-    function(match, val) {
-      val = val.trim();
-      if (val === 'null' || val === 'true' || val === 'false') return ':' + val;
-      if (/^-?[1-9]\d*(\.\d+)?$/.test(val) || val === '0') return ':' + val; // số hợp lệ
-      return ':"' + val + '"';
-    }
-  );
-
-  // ─── BƯỚC 8: Giá trị rỗng -> null ────────────────────────────────────────
-  // Ví dụ: {key:, ...} -> {"key":null, ...}
-  s = s.replace(/:\s*(?=[,}\]])/g, ':null');
-
-  // ─── BƯỚC 8b: Catch-all cho giá trị có ký tự đặc biệt (@, ., v.v.) ───────
-  // Xử lý email, URL, mã có dấu chấm/gạch ngang mà các bước trước bỏ sót
-  // Ví dụ: email=test@example.com -> "email":"test@example.com"
-  //        score=99.5             -> "score":99.5  (số thập phân giữ nguyên)
-  s = s.replace(/:\s*([^",\[{\]}\s][^",\[{\]}\n]*)(?=\s*[,}])/g, function(match, val) {
-    val = val.trim();
-    if (val === 'null' || val === 'true' || val === 'false') return ':' + val;
-    if (/^-?\d+(\.\d+)?([eE][+\-]?\d+)?$/.test(val)) return ':' + val;
-    if (val.startsWith('"')) return ':' + val;
-    return ':"' + val + '"';
-  });
-
-  // ─── BƯỚC 9: Quote các giá trị string chưa được quote ────────────────────
-  // Hỗ trợ cả ký tự Latin lẫn Kanji/Hiragana/Katakana (tiếng Nhật)
-  // Ví dụ: type=book -> "type":"book"
-  s = s.replace(
-    /:\s*([A-Za-z\u3000-\u9FFF\u30A0-\u30FF\u3040-\u309F][A-Za-z0-9\u3000-\u9FFF\u30A0-\u30FF\u3040-\u309F_\-]*)/g,
-    function(match, val) {
-      if (val === 'null' || val === 'true' || val === 'false') return ':' + val;
-      return ':"' + val + '"';
-    }
-  );
-
-  // ─── BƯỚC 10: Quote các phần tử chưa có quote trong array ────────────────
-  // Ví dụ: [foo, bar, 123] -> ["foo", "bar", 123]
-  // Bỏ qua array chứa object {} hoặc array lồng nhau []
-  function quoteArrayElements(match, content) {
-    if (content.indexOf('{') !== -1 || content.indexOf('[') !== -1) return match;
-    var parts = content.split(/,\s*/);
-    var fixed = parts.map(function(p) {
-      p = p.trim();
-      if (!p) return 'null';                                               // phần tử rỗng
-      if (p.startsWith('"') || p === 'null' || p === 'true' || p === 'false') return p;
-      if (/^-?[1-9]\d*(\.\d+)?$/.test(p) || p === '0') return p;         // số
-      return '"' + p + '"';                                                // bọc string
-    });
-    return '[' + fixed.join(', ') + ']';
+  if (RE_CLASS_PREFIX_SQ.test(result)) {
+    result = result.replace(RE_CLASS_PREFIX_SQ, () => '{');
+    if (result.endsWith(']')) result = result.slice(0, -1) + '}';
   }
 
-  // Lặp đệ quy để xử lý array lồng nhau từ trong ra ngoài
-  var prev2;
+  const outerParen = result.match(RE_OUTER_PAREN);
+  if (outerParen) result = '{' + outerParen[1] + '}';
+
+  let prev;
+  do {
+    prev = result;
+    result = result.replaceAll(RE_NESTED_BRACE,    () => '{');
+    result = result.replaceAll(RE_NESTED_PAREN,    () => '{');
+    result = result.replaceAll(RE_CLOSE_PAREN_MID, () => '}');
+    result = result.replace(   RE_CLOSE_PAREN_END, () => '}');
+  } while (result !== prev);
+
+  return result;
+}
+
+/**
+ * Sửa single-quote chưa đóng: ='val, next= -> ='val', next=
+ */
+function fixUnclosedSingleQuotes(s) {
+  let prev1;
+  do {
+    prev1 = s;
+    s = s.replaceAll(RE_UNCLOSED_SQ_1, (_, v) => "='" + v + "'");
+  } while (s !== prev1);
+
+  let prev2;
   do {
     prev2 = s;
-    s = s.replace(/\[([^\[\]]*)\]/g, quoteArrayElements);
+    s = s.replaceAll(RE_UNCLOSED_SQ_2, (_, v) => "='" + v + "'");
   } while (s !== prev2);
 
-  // ─── BƯỚC 10b: Loại bỏ dấu phẩy thừa trước } hoặc ] ────────────────────
-  // Ví dụ: {name=Charlie, age=28,} -> {"name":"Charlie","age":28}
-  s = s.replace(/,\s*([}\]])/g, '$1');
+  return s.replace(RE_UNCLOSED_SQ_END, (_, v) => "='" + v + "'}");
+}
 
-  // ─── BƯỚC 11: Validate kết quả cuối cùng ─────────────────────────────────
-  // Thử parse JSON — nếu hợp lệ thì trả về, không thì trả về null
-  try {
+/**
+ * Bổ sung dấu } bị thiếu ở cuối chuỗi bị truncate.
+ * S4138: dùng for...of
+ */
+function fixTruncatedBraces(s) {
+  const t = s.trim();
+  if (!t.startsWith('{') || t.endsWith('}')) return s;
+  let depth = 0;
+  for (const ch of t) {
+    if (ch === '{') depth++;
+    else if (ch === '}') depth--;
+  }
+  return depth > 0 ? t + '}'.repeat(depth) : s;
+}
+
+/**
+ * Bước 6 & 7: xử lý giá trị leading-zero và giá trị có khoảng trắng bên trong.
+ */
+function wrapLeadingZeroOrSpacedVal(match) {
+  const v = match.replace(RE_STRIP_COLON_PREFIX, '').trim();
+  if (v === 'null' || v === 'true' || v === 'false') return ':' + v;
+  if (RE_IS_VALID_NUMBER.test(v) || v === '0') return ':' + v;
+  return ':"' + v + '"';
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+
+function normalizeToJson(INPUT) {
+  if (!INPUT || INPUT.trim() === '') return null;          // +1 (if) +1 (||)
+  let s = INPUT.trim();
+
+  const janResult = tryParseJanList(s);                   // complexity moved to helper
+  if (janResult) return janResult;                        // +1
+
+  if (RE_JUNK_BRACKET.test(s)) return null;               // +1
+  if (RE_JUNK_BRACKET_Q.test(s)) return null;             // +1
+
+  s = normalizeClassPrefixes(s);                          // complexity moved to helper
+
+  // ─── BƯỚC 1b & 1c: Sửa CSV và newline ────────────────────────────────────
+  s = s.replaceAll(RE_DOUBLE_QUOTE_CSV, (_, inner) => '"' + inner + '"');
+  s = s.replaceAll(RE_NEWLINE_COMMA,    (_, a, b)  => a + ',\n' + b);
+
+  // ─── Sửa lỗi đặc biệt ────────────────────────────────────────────────────
+  s = s.replaceAll("=null'", '=null');
+  s = s.replaceAll(RE_DOUBLE_SQ,    (_, a, b)    => a + "'" + b);
+  s = s.replaceAll(RE_ARRAY_IN_SQ,  (_, k, v)   => '"' + k + '":[' + v + ']');
+  s = s.replaceAll("]'", ']');
+
+  s = fixUnclosedSingleQuotes(s);                         // complexity moved to helper
+  s = fixTruncatedBraces(s);                              // complexity moved to helper
+
+  s = s.replaceAll(RE_LEADING_COMMA,    () => '{');
+  s = s.replaceAll(RE_MISSING_COMMA_SQ, (_, v, sp, k) => "'" + v + "'," + sp + k);
+
+  // ─── BƯỚC 2 & 3: Single-quote -> double-quote ────────────────────────────
+  s = s.replaceAll(RE_SINGLE_QUOTED, (_, inner) =>
+    "'" + inner.replaceAll(RE_WHITESPACE, () => '').replaceAll(RE_COMMA_SPACES, () => ',').trim() + "'"
+  );
+  s = s.replaceAll(RE_SINGLE_QUOTED, (_, v) => '"' + v + '"');
+
+  // ─── BƯỚC 4: Quote key ───────────────────────────────────────────────────
+  s = s.replaceAll(RE_KEY_EQUALS, extractKey);
+  s = s.replaceAll(RE_KEY_COLON,  extractKey);
+
+  // ─── BƯỚC 5 - 9: Chuẩn hóa giá trị ──────────────────────────────────────
+  s = s.replaceAll(RE_SCALAR_MULTI,     wrapScalarMulti);
+  s = s.replaceAll(RE_DATETIME_VAL,     wrapDatetimeVal);
+  s = s.replaceAll(RE_LEADING_ZERO_VAL, wrapLeadingZeroOrSpacedVal);
+  s = s.replaceAll(RE_SPACED_VAL,       wrapLeadingZeroOrSpacedVal);
+  s = s.replaceAll(RE_EMPTY_VAL,        () => ':null');
+  s = s.replaceAll(RE_CATCHALL_VAL,     (_, val) => wrapScalarValue(val));
+  s = s.replaceAll(RE_UNQUOTED_STR,     (_, val) => {
+    if (val === 'null' || val === 'true' || val === 'false') return ':' + val;  // +1
+    return ':"' + val + '"';
+  });
+
+  // ─── BƯỚC 10: Quote array elements ───────────────────────────────────────
+  let prevArray;
+  do {                                                    // +1 (do-while)
+    prevArray = s;
+    s = s.replaceAll(RE_INNER_ARRAY, quoteArrayElements);
+  } while (s !== prevArray);
+
+  s = s.replaceAll(RE_TRAILING_COMMA, (_, bracket) => bracket);
+
+  // ─── BƯỚC 11: Validate ───────────────────────────────────────────────────
+  try {                                                   // +1 (catch)
     JSON.parse(s);
     return s;
-  } catch(e) {
+  } catch {
     return null;
   }
 }
