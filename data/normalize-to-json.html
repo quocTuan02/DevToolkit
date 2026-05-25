@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>normalizeToJson — Demo</title>
+<title>Normalize To Json</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Syne:wght@400;700;800&display=swap');
 
@@ -338,7 +338,7 @@
 <body>
 
 <div class="header">
-  <h1>normalizeToJson</h1>
+  <h1>Normalize To Json</h1>
   <p>Chuyển đổi Java toString, Kotlin data class, unquoted object… thành JSON hợp lệ.</p>
   <button class="theme-btn" id="theme-btn" onclick="toggleTheme()" title="Chuyển giao diện sáng/tối">🌙</button>
 </div>
@@ -468,8 +468,12 @@ function syntaxHighlight(json) {
   );
 }
 
-function escHtml(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function escHtml(unsafe) {
+  return unsafe
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          // .replace(/"/g, "&quot;");
 }
 
 function toggleTheme() {

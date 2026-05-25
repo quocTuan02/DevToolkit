@@ -12,7 +12,7 @@ A personal collection of developer tools for AWS, data, and shell scripting.
 ### Data Tools
 
 - **[CSV Diff Viewer](data/csv-diff-viewer.html)** - Side-by-side diff viewer for two CSV files. Highlights added, removed, and changed rows with dark/light theme support.
-- **[normalizeToJson Demo](data/normalize-to-json-demo.html)** - Interactive demo for `normalizeToJson.js`. Converts loose object formats (Java/Kotlin toString, single-quoted, unquoted key-value, JAN code list, truncated strings) into valid JSON, with syntax highlighting and dark/light theme support.
+- **[normalizeToJson Demo](data/normalize-to-json.html)** - Interactive demo for `normalizeToJson.js`. Converts loose object formats (Java/Kotlin toString, single-quoted, unquoted key-value, JAN code list, truncated strings) into valid JSON, with syntax highlighting and dark/light theme support.
 
 ### Shell Scripts
 
