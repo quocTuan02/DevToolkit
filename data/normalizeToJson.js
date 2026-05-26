@@ -263,6 +263,14 @@ function normalizeToJson(INPUT) {
     return '__URL' + (urlStore.length - 1) + '__';
   });
 
+  // Bảo vệ nội dung janCodes=[...] trước normalizeClassPrefixes,
+  // vì RE_NESTED_PAREN sẽ biến IROCK( -> { nếu không được bảo vệ.
+  const janStore = [];
+  s = s.replaceAll(RE_JANCODES_ARRAY, (_, c) => {
+    janStore.push(normalizeArrayContent(c));
+    return 'janCodes=__JANCODES' + (janStore.length - 1) + '__';
+  });
+
   s = normalizeClassPrefixes(s);                          // complexity moved to helper
 
   // ─── BƯỚC 1b & 1c: Sửa CSV và newline ────────────────────────────────────
@@ -270,10 +278,6 @@ function normalizeToJson(INPUT) {
   s = s.replaceAll(RE_NEWLINE_COMMA,    (_, a, b)  => a + ',\n' + b);
 
   // ─── Sửa lỗi đặc biệt ────────────────────────────────────────────────────
-  // Chuẩn hóa janCodes=[text] trước RE_TAB_IN_ARRAY và RE_SINGLE_QUOTED,
-  // tránh dấu ' hoặc \t trong nội dung mảng bị xử lý nhầm.
-  s = s.replaceAll(RE_JANCODES_ARRAY, (_, c) => 'janCodes=' + normalizeArrayContent(c));
-
   // jan='digit1,\ndigit2,...' — single-quoted multiline JAN list (RE_SINGLE_QUOTED can't cross \n)
   s = s.replaceAll(RE_JAN_SQ_FIELD, (_, content) => {
     const codes = content.split(/[\s,]+/).map(v => v.trim()).filter(v => /^\d+$/.test(v));
@@ -346,6 +350,12 @@ function normalizeToJson(INPUT) {
   // Restore URLs (đã được quote vào chuỗi JSON bởi các bước trên)
   urlStore.forEach((url, i) => {
     s = s.replaceAll('__URL' + i + '__', url.replaceAll('\\', '\\\\').replaceAll('"', String.raw`\"`));
+  });
+
+  // Restore janCodes đã được normalize và bảo vệ từ đầu pipeline
+  janStore.forEach((val, i) => {
+    s = s.replaceAll('"__JANCODES' + i + '__"', val);
+    s = s.replaceAll('__JANCODES' + i + '__', val);
   });
 
   // ─── BƯỚC 11: Validate ───────────────────────────────────────────────────

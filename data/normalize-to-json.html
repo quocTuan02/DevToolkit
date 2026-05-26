@@ -786,6 +786,7 @@ function clearAll() {
 
 function onInputChange() {
   document.querySelectorAll('.example-btn').forEach(b => b.classList.remove('active'));
+  runNormalize();
 }
 
 function copyOutput() {
@@ -1045,6 +1046,11 @@ function toggleTheme() {
   document.getElementById('theme-btn').textContent = isLight ? '☀️' : '🌙';
   localStorage.setItem('normalize-json-theme', isLight ? 'light' : 'dark');
 }
+
+/* ── Auto-convert on paste ── */
+document.getElementById('input-area').addEventListener('paste', () => {
+  setTimeout(runNormalize, 0);
+});
 
 /* ── Init ── */
 if (localStorage.getItem('normalize-json-theme') === 'light') {
