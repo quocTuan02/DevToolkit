@@ -204,6 +204,39 @@
     align-items: center;
   }
 
+  /* ── Mode tabs ── */
+  .mode-tabs {
+    display: flex;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 0.2rem;
+  }
+
+  .mode-tab {
+    background: transparent;
+    border: none;
+    border-radius: 7px;
+    padding: 0.3rem 0.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+    color: var(--text-dim);
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+  }
+
+  .mode-tab.active {
+    background: var(--accent);
+    color: #0a0c10;
+  }
+
+  .mode-tab:not(.active):hover { color: var(--text); }
+
+  /* ── Single mode buttons ── */
   .btn-normalize {
     background: var(--accent);
     color: #0a0c10;
@@ -215,6 +248,7 @@
     font-family: 'Syne', sans-serif;
     cursor: pointer;
     transition: opacity 0.15s;
+    white-space: nowrap;
   }
 
   .btn-normalize:hover { opacity: 0.85; }
@@ -229,6 +263,7 @@
     font-family: 'Syne', sans-serif;
     cursor: pointer;
     transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
   }
 
   .btn-clear:hover { border-color: var(--text-dim); color: var(--text); }
@@ -244,12 +279,13 @@
     cursor: pointer;
     margin-left: auto;
     transition: border-color 0.15s, color 0.15s;
+    white-space: nowrap;
   }
 
   .btn-copy:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   .btn-copy:disabled { opacity: 0.35; cursor: default; }
 
-  /* ── Editor row ── */
+  /* ── Editor row (single mode) ── */
   .editor-row {
     flex: 1;
     display: grid;
@@ -333,6 +369,227 @@
   .jn  { color: var(--num-color); }
   .jb  { color: var(--bool-color); }
   .jnl { color: var(--null-color); }
+
+  /* ══════════════════════════════════════════════
+     CSV MODE
+  ══════════════════════════════════════════════ */
+
+  #csv-actions {
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    flex: 1;
+  }
+
+  .col-label {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  select.col-select {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 0.38rem 0.6rem;
+    font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    max-width: 220px;
+    outline: none;
+  }
+
+  .csv-stats {
+    font-size: 0.78rem;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+
+  .csv-stats .ok  { color: var(--accent); }
+  .csv-stats .err { color: var(--accent2); }
+
+  /* ── CSV content area ── */
+  #csv-content {
+    display: none;
+    flex: 1;
+    flex-direction: column;
+    gap: 0.65rem;
+    overflow: hidden;
+  }
+
+  /* Drop zone */
+  .drop-zone {
+    flex: 1;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--surface);
+    color: var(--text-dim);
+    font-size: 0.88rem;
+    user-select: none;
+  }
+
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(0, 212, 170, 0.04);
+  }
+
+  .drop-zone svg { opacity: 0.35; }
+
+  .drop-zone-hint {
+    font-size: 0.72rem;
+    opacity: 0.65;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Results table */
+  .csv-table-wrap {
+    flex: 1;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface);
+  }
+
+  .csv-table-wrap::-webkit-scrollbar { width: 5px; }
+  .csv-table-wrap::-webkit-scrollbar-track { background: transparent; }
+  .csv-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .csv-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.78rem;
+  }
+
+  .csv-table thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+
+  .csv-table th {
+    background: var(--surface2);
+    padding: 0.5rem 0.75rem;
+    text-align: left;
+    font-size: 0.61rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    font-family: 'Syne', sans-serif;
+    white-space: nowrap;
+  }
+
+  .csv-table tr.data-row {
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .csv-table tr.data-row:hover { background: var(--surface-hover); }
+  .csv-table tr.data-row.expanded { background: var(--surface2); }
+
+  .csv-table td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+
+  .td-num    { width: 3rem; color: var(--text-dim); text-align: right; white-space: nowrap; }
+  .td-status { width: 7.5rem; white-space: nowrap; }
+  .td-input  { width: 35%; max-width: 0; }
+  .td-output { max-width: 0; }
+
+  .cell-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: block;
+    color: var(--text);
+  }
+
+  .td-input .cell-text { color: var(--text-dim); }
+
+  /* Detail expanded row */
+  tr.detail-row td {
+    padding: 0;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .detail-content {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    padding: 0.6rem 0.75rem 0.75rem;
+  }
+
+  .detail-pane {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .detail-pane-header {
+    flex-shrink: 0;
+    padding: 0.3rem 0.6rem;
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    font-weight: 700;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+    font-family: 'Syne', sans-serif;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .btn-copy-sm {
+    background: transparent;
+    border: none;
+    color: var(--text-dim);
+    cursor: pointer;
+    font-size: 0.68rem;
+    padding: 0;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    transition: color 0.12s;
+  }
+
+  .btn-copy-sm:hover { color: var(--accent); }
+
+  .detail-pane-body {
+    flex: 1;
+    padding: 0.6rem;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.73rem;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 200px;
+    overflow-y: auto;
+    line-height: 1.6;
+    color: var(--text);
+  }
+
+  .detail-pane-body::-webkit-scrollbar { width: 4px; }
+  .detail-pane-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
 </style>
 </head>
 <body>
@@ -346,7 +603,7 @@
 <div class="app-layout">
 
   <!-- Sidebar examples -->
-  <aside class="sidebar">
+  <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">Ví dụ có sẵn</div>
     <div class="examples-list" id="examples-grid"></div>
   </aside>
@@ -354,13 +611,39 @@
   <!-- Main -->
   <div class="main-area">
 
+    <!-- Action row -->
     <div class="action-row">
-      <button class="btn-normalize" onclick="runNormalize()">Normalize →</button>
-      <button class="btn-clear" onclick="clearAll()">Xoá</button>
-      <button class="btn-copy" id="btn-copy" onclick="copyOutput()" disabled>Sao chép kết quả</button>
+      <div class="mode-tabs">
+        <button class="mode-tab active" id="tab-single" onclick="switchMode('single')">Single</button>
+        <button class="mode-tab"        id="tab-csv"    onclick="switchMode('csv')">CSV</button>
+      </div>
+
+      <!-- Single mode actions -->
+      <div id="single-actions" style="display:flex;gap:0.6rem;align-items:center;flex:1">
+        <button class="btn-normalize" onclick="runNormalize()">Normalize →</button>
+        <button class="btn-clear" onclick="clearAll()">Xoá</button>
+        <button class="btn-copy" id="btn-copy" onclick="copyOutput()" disabled>Sao chép kết quả</button>
+      </div>
+
+      <!-- CSV mode actions -->
+      <div id="csv-actions">
+        <button class="btn-normalize" onclick="document.getElementById('csv-file-input').click()">Mở CSV…</button>
+        <input type="file" id="csv-file-input" accept=".csv,.txt" style="display:none" onchange="handleFileLoad(this.files[0])">
+
+        <label class="col-label" id="col-label" style="display:none">
+          Cột:&nbsp;<select class="col-select" id="col-select" onchange="runCSVConvert()"></select>
+        </label>
+
+        <span class="csv-stats" id="csv-stats"></span>
+
+        <button class="btn-copy" id="btn-download" onclick="downloadResults()" disabled style="margin-left:auto">
+          Tải JSON
+        </button>
+      </div>
     </div>
 
-    <div class="editor-row">
+    <!-- Single mode: editor panels -->
+    <div class="editor-row" id="editor-row">
       <div class="panel">
         <div class="panel-header">
           <span class="panel-title">Input</span>
@@ -377,11 +660,52 @@
       </div>
     </div>
 
+    <!-- CSV mode: content -->
+    <div id="csv-content">
+
+      <!-- Drop zone (shown when no file loaded) -->
+      <div class="drop-zone" id="drop-zone"
+           onclick="document.getElementById('csv-file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('dragover')"
+           ondragleave="this.classList.remove('dragover')"
+           ondrop="event.preventDefault();this.classList.remove('dragover');handleFileLoad(event.dataTransfer.files[0])">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14,2 14,8 20,8"/>
+          <line x1="12" y1="18" x2="12" y2="12"/>
+          <polyline points="9,15 12,12 15,15"/>
+        </svg>
+        <span>Kéo thả file CSV vào đây hoặc click để chọn</span>
+        <span class="drop-zone-hint">Hỗ trợ .csv · Cột chứa request sẽ được tự động nhận diện</span>
+      </div>
+
+      <!-- Results table (shown after file loaded) -->
+      <div class="csv-table-wrap" id="csv-table-wrap" style="display:none">
+        <table class="csv-table">
+          <thead>
+            <tr>
+              <th class="td-num">#</th>
+              <th class="td-status">Status</th>
+              <th class="td-input">Input</th>
+              <th class="td-output">Output JSON</th>
+            </tr>
+          </thead>
+          <tbody id="csv-tbody"></tbody>
+        </table>
+      </div>
+
+    </div>
+    <!-- /csv-content -->
+
   </div>
 </div>
 
 <script src="normalizeToJson.js"></script>
 <script>
+
+/* ──────────────────────────────────────────
+   EXAMPLES (single mode)
+────────────────────────────────────────── */
 const EXAMPLES = [
   { title: 'Java toString()',        input: 'Person{name=John, age=30, active=true}' },
   { title: 'Kotlin data class',      input: 'User(id=123, email=test@example.com, active=true, score=99.5)' },
@@ -412,10 +736,27 @@ function loadExample(idx) {
   runNormalize();
 }
 
+/* ──────────────────────────────────────────
+   MODE TOGGLE
+────────────────────────────────────────── */
+function switchMode(m) {
+  const isCsv = m === 'csv';
+  document.getElementById('tab-single').classList.toggle('active', !isCsv);
+  document.getElementById('tab-csv').classList.toggle('active', isCsv);
+  document.getElementById('single-actions').style.display = isCsv ? 'none' : 'flex';
+  document.getElementById('csv-actions').style.display    = isCsv ? 'flex' : 'none';
+  document.getElementById('editor-row').style.display     = isCsv ? 'none' : 'grid';
+  document.getElementById('csv-content').style.display    = isCsv ? 'flex' : 'none';
+  document.getElementById('sidebar').style.display        = isCsv ? 'none' : 'flex';
+}
+
+/* ──────────────────────────────────────────
+   SINGLE MODE LOGIC
+────────────────────────────────────────── */
 function runNormalize() {
-  const input = document.getElementById('input-area').value;
-  const badge   = document.getElementById('status-badge');
-  const box     = document.getElementById('output-box');
+  const input  = document.getElementById('input-area').value;
+  const badge  = document.getElementById('status-badge');
+  const box    = document.getElementById('output-box');
   const copyBtn = document.getElementById('btn-copy');
 
   if (!input.trim()) {
@@ -456,6 +797,229 @@ function copyOutput() {
   });
 }
 
+/* ──────────────────────────────────────────
+   CSV MODE LOGIC
+────────────────────────────────────────── */
+let csvRows      = [];   // all parsed rows (raw strings per cell)
+let csvHasHeader = false;
+let csvResults   = [];   // [{rowNum, input, result, json, skipped}]
+
+/** RFC 4180-compatible CSV parser (supports quoted fields with embedded newlines) */
+function parseCSV(text) {
+  const rows = [];
+  let i = 0;
+  const n = text.length;
+
+  while (i < n) {
+    const row = [];
+    while (i < n) {
+      let field = '';
+      if (text[i] === '"') {
+        i++;
+        while (i < n) {
+          if (text[i] === '"') {
+            if (i + 1 < n && text[i + 1] === '"') { field += '"'; i += 2; }
+            else { i++; break; }
+          } else {
+            field += text[i++];
+          }
+        }
+      } else {
+        while (i < n && text[i] !== ',' && text[i] !== '\n' && text[i] !== '\r')
+          field += text[i++];
+      }
+      row.push(field);
+      if (i < n && text[i] === ',') { i++; continue; }
+      if (i < n && text[i] === '\r') i++;
+      if (i < n && text[i] === '\n') i++;
+      break;
+    }
+    if (row.some(f => f.trim())) rows.push(row);
+  }
+  return rows;
+}
+
+function handleFileLoad(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const rows = parseCSV(e.target.result);
+    if (rows.length === 0) return;
+
+    csvRows = rows;
+
+    // Detect header: first row cells are short plain strings (no {, (, =)
+    csvHasHeader = rows[0].every(c => {
+      const t = c.trim();
+      return t.length > 0 && t.length < 60 && !/[{}()=]/.test(t);
+    });
+
+    // Build column selector
+    const headers = csvHasHeader ? rows[0] : rows[0].map((_, i) => 'Column ' + (i + 1));
+    const sel = document.getElementById('col-select');
+    sel.innerHTML = '';
+    headers.forEach((h, i) => {
+      const opt = document.createElement('option');
+      opt.value = i;
+      opt.textContent = (i + 1) + '. ' + (h.length > 35 ? h.slice(0, 35) + '…' : h);
+      sel.appendChild(opt);
+    });
+
+    // Auto-detect: prefer column whose header contains REQUEST, fallback to col 0
+    let autoCol = 0;
+    if (csvHasHeader) {
+      const ri = headers.findIndex(h => /request/i.test(h));
+      if (ri >= 0) autoCol = ri;
+    }
+    sel.value = autoCol;
+
+    document.getElementById('col-label').style.display = '';
+    document.getElementById('drop-zone').style.display = 'none';
+    document.getElementById('csv-table-wrap').style.display = '';
+
+    runCSVConvert();
+  };
+  reader.readAsText(file);
+}
+
+function runCSVConvert() {
+  const colIdx = parseInt(document.getElementById('col-select').value, 10);
+  const dataRows = csvHasHeader ? csvRows.slice(1) : csvRows;
+
+  csvResults = dataRows.map((row, i) => {
+    const rowNum = i + (csvHasHeader ? 2 : 1);
+    const input  = (row[colIdx] || '').trim();
+    if (!input) return { rowNum, input, result: null, json: null, skipped: true };
+
+    const result = normalizeToJson(input);
+    let json = null;
+    try { if (result) json = JSON.parse(result); } catch (_) {}
+    return { rowNum, input, result, json, skipped: false };
+  });
+
+  renderCSVTable();
+}
+
+function renderCSVTable() {
+  const tbody  = document.getElementById('csv-tbody');
+  const total   = csvResults.length;
+  const passed  = csvResults.filter(r => r.result).length;
+  const failed  = csvResults.filter(r => !r.skipped && !r.result).length;
+  const skipped = csvResults.filter(r => r.skipped).length;
+
+  // Stats
+  let statsHtml = `<span class="ok">${passed}</span> / ${total} converted`;
+  if (failed)  statsHtml += ` · <span class="err">${failed} failed</span>`;
+  if (skipped) statsHtml += ` · ${skipped} skipped`;
+  document.getElementById('csv-stats').innerHTML = statsHtml;
+  document.getElementById('btn-download').disabled = passed === 0;
+
+  // Table rows
+  tbody.innerHTML = '';
+  csvResults.forEach((r, idx) => {
+    const tr = document.createElement('tr');
+    tr.className = 'data-row';
+
+    const badgeCls  = r.skipped ? 'badge-idle' : r.result ? 'badge-ok' : 'badge-err';
+    const badgeTxt  = r.skipped ? 'skip' : r.result ? 'valid JSON' : 'null';
+    const inputPrev = r.input.replace(/\s+/g, ' ').slice(0, 100);
+    const outPrev   = r.json
+      ? JSON.stringify(r.json).replace(/"/g, '').slice(0, 100)
+      : (r.skipped ? '' : 'null — không parse được');
+
+    tr.innerHTML = `
+      <td class="td-num">${r.rowNum}</td>
+      <td class="td-status"><span class="badge ${badgeCls}">${badgeTxt}</span></td>
+      <td class="td-input"><span class="cell-text">${escHtml(inputPrev)}</span></td>
+      <td class="td-output"><span class="cell-text" style="${!r.result && !r.skipped ? 'color:var(--accent2);font-style:italic' : ''}">${escHtml(outPrev)}</span></td>
+    `;
+
+    tr.onclick = () => toggleDetail(tr, idx);
+    tbody.appendChild(tr);
+  });
+}
+
+function toggleDetail(tr, idx) {
+  // Collapse if already open
+  const next = tr.nextElementSibling;
+  if (next && next.classList.contains('detail-row')) {
+    next.remove();
+    tr.classList.remove('expanded');
+    return;
+  }
+
+  tr.classList.add('expanded');
+  const r = csvResults[idx];
+  const jsonStr = r.json ? JSON.stringify(r.json, null, 2) : null;
+
+  const detail = document.createElement('tr');
+  detail.className = 'detail-row';
+  detail.innerHTML = `
+    <td colspan="4">
+      <div class="detail-content">
+        <div class="detail-pane">
+          <div class="detail-pane-header">
+            <span>Input</span>
+            <button class="btn-copy-sm" data-copy="input">Copy</button>
+          </div>
+          <div class="detail-pane-body">${escHtml(r.input)}</div>
+        </div>
+        <div class="detail-pane">
+          <div class="detail-pane-header">
+            <span>Output JSON</span>
+            ${jsonStr ? '<button class="btn-copy-sm" data-copy="json">Copy</button>' : ''}
+          </div>
+          <div class="detail-pane-body">${
+            jsonStr
+              ? syntaxHighlight(jsonStr)
+              : '<span style="color:var(--accent2);font-style:italic">null — không parse được</span>'
+          }</div>
+        </div>
+      </div>
+    </td>
+  `;
+
+  // Attach copy button handlers
+  detail.querySelector('[data-copy="input"]').addEventListener('click', e => {
+    e.stopPropagation();
+    copyText(r.input, e.currentTarget);
+  });
+  const jsonCopyBtn = detail.querySelector('[data-copy="json"]');
+  if (jsonCopyBtn) {
+    jsonCopyBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      copyText(jsonStr, e.currentTarget);
+    });
+  }
+
+  tr.parentNode.insertBefore(detail, tr.nextSibling);
+}
+
+function copyText(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function downloadResults() {
+  const arr = csvResults.filter(r => r.json).map(r => r.json);
+  const blob = new Blob([JSON.stringify(arr, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `normalized_${new Date()
+          .toISOString()
+          .replace('T', '_')
+          .replace(/:/g, '-')
+          .slice(0, 19)}.json`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* ──────────────────────────────────────────
+   SHARED HELPERS
+────────────────────────────────────────── */
 function syntaxHighlight(json) {
   return escHtml(json).replace(
     /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
@@ -482,6 +1046,7 @@ function toggleTheme() {
   localStorage.setItem('normalize-json-theme', isLight ? 'light' : 'dark');
 }
 
+/* ── Init ── */
 if (localStorage.getItem('normalize-json-theme') === 'light') {
   document.body.classList.add('light');
   document.getElementById('theme-btn').textContent = '☀️';
