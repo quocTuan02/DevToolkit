@@ -152,7 +152,11 @@
     font-size: 14px;
   }
 
-  .col-filter {
+  .col-picker-wrap {
+    position: relative;
+  }
+
+  .col-picker-btn {
     background: var(--surface2);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -162,9 +166,100 @@
     font-size: 12px;
     outline: none;
     cursor: pointer;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: border-color 0.2s;
   }
 
-  .col-filter:focus { border-color: var(--accent); }
+  .col-picker-btn:hover, .col-picker-btn.open { border-color: var(--accent); color: var(--accent); }
+
+  .col-picker-panel {
+    display: none;
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 200;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    min-width: 220px;
+    max-width: 300px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    overflow: hidden;
+  }
+
+  .col-picker-panel.open { display: flex; flex-direction: column; }
+
+  .col-picker-search {
+    padding: 10px 12px 6px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .col-picker-search input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 10px;
+    color: var(--text);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    outline: none;
+  }
+
+  .col-picker-search input:focus { border-color: var(--accent); }
+
+  .col-picker-actions {
+    display: flex;
+    gap: 12px;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .col-picker-actions button {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 0;
+  }
+
+  .col-picker-actions button:hover { text-decoration: underline; }
+
+  .col-picker-list {
+    overflow-y: auto;
+    max-height: 280px;
+    padding: 4px 0;
+  }
+
+  .col-picker-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: background 0.1s;
+  }
+
+  .col-picker-item:hover { background: var(--surface2); color: var(--text); }
+
+  .col-picker-item input[type=checkbox] {
+    accent-color: var(--accent);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .col-picker-item span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
   label.toggle {
     display: flex;
@@ -201,6 +296,24 @@
   }
 
   .upload-btn:hover { opacity: 0.85; }
+
+  .export-btn {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 12px;
+    cursor: pointer;
+    letter-spacing: 0.5px;
+    transition: border-color 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+
+  .export-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .export-btn:disabled { opacity: 0.3; cursor: default; }
 
   /* Drop zone */
   .drop-zone {
@@ -676,13 +789,27 @@
     <span class="search-icon">🔍</span>
     <input type="text" id="search-input" placeholder="Search CAPRODUCTID or value...">
   </div>
-  <select class="col-filter" id="col-filter">
-    <option value="">All columns</option>
-  </select>
+  <div class="col-picker-wrap" id="col-picker-wrap">
+    <button class="col-picker-btn" id="col-picker-btn" onclick="toggleColPicker()">
+      <span id="col-picker-label">Columns</span>
+      <span>▾</span>
+    </button>
+    <div class="col-picker-panel" id="col-picker-panel">
+      <div class="col-picker-search">
+        <input type="text" id="col-picker-search" placeholder="Search columns..." oninput="filterColPicker(this.value)">
+      </div>
+      <div class="col-picker-actions">
+        <button onclick="setAllColsVisible(true)">All</button>
+        <button onclick="setAllColsVisible(false)">None</button>
+      </div>
+      <div class="col-picker-list" id="col-picker-list"></div>
+    </div>
+  </div>
   <label class="toggle">
     <input type="checkbox" id="only-diff"> Only changed cells
   </label>
   <button class="upload-btn" onclick="document.getElementById('file-input').click()">↑ Load CSV</button>
+  <button class="export-btn" id="export-btn" disabled onclick="exportCSV()">↓ Export CSV</button>
 </div>
 
 <div id="drop-zone" class="drop-zone">
@@ -781,8 +908,8 @@
   let pageSize = 50;
   let sortCol = -1;
   let sortAsc = true;
-  let filterCol = '';
   let searchTerm = '';
+  let visibleCols = null; // null = all visible; Set = specific set visible
   let onlyDiff = false;
 
   // Column popup state
@@ -850,19 +977,74 @@
   }
 
   function buildColFilter(hdrs) {
-    const sel = document.getElementById('col-filter');
-    sel.innerHTML = '<option value="">All columns</option>';
-    const bases = new Set();
-    hdrs.forEach(h => {
-      if (h.startsWith('A_')) bases.add(h.slice(2));
-    });
-    [...bases].sort((a, b) => a.localeCompare(b)).forEach(b => {
-      const opt = document.createElement('option');
-      opt.value = b;
-      opt.textContent = b;
-      sel.appendChild(opt);
+    visibleCols = null;
+    document.getElementById('col-picker-search').value = '';
+    renderColPickerItems(hdrs, '');
+    updateColPickerLabel();
+  }
+
+  function renderColPickerItems(hdrs, search) {
+    const list = document.getElementById('col-picker-list');
+    list.innerHTML = '';
+    const q = search.toLowerCase();
+    hdrs.filter(h => !q || h.toLowerCase().includes(q)).forEach(h => {
+      const item = document.createElement('label');
+      item.className = 'col-picker-item';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.value = h;
+      cb.checked = !visibleCols || visibleCols.has(h);
+      cb.addEventListener('change', () => {
+        if (!visibleCols) visibleCols = new Set(headers);
+        if (cb.checked) visibleCols.add(h);
+        else visibleCols.delete(h);
+        updateColPickerLabel();
+        renderTable();
+      });
+      const span = document.createElement('span');
+      span.title = h;
+      span.textContent = h;
+      item.appendChild(cb);
+      item.appendChild(span);
+      list.appendChild(item);
     });
   }
+
+  function updateColPickerLabel() {
+    const visible = visibleCols ? visibleCols.size : headers.length;
+    const total = headers.length;
+    const btn = document.getElementById('col-picker-btn');
+    const label = document.getElementById('col-picker-label');
+    label.textContent = visible === total ? 'Columns' : `Columns (${visible}/${total})`;
+    btn.classList.toggle('open', visible !== total);
+  }
+
+  function toggleColPicker() {
+    const panel = document.getElementById('col-picker-panel');
+    const btn = document.getElementById('col-picker-btn');
+    const isOpen = panel.classList.toggle('open');
+    btn.classList.toggle('open', isOpen);
+    if (isOpen) document.getElementById('col-picker-search').focus();
+  }
+
+  function filterColPicker(val) {
+    renderColPickerItems(headers, val);
+  }
+
+  function setAllColsVisible(show) {
+    visibleCols = show ? null : new Set();
+    renderColPickerItems(headers, document.getElementById('col-picker-search').value);
+    updateColPickerLabel();
+    renderTable();
+  }
+
+  document.addEventListener('click', e => {
+    const wrap = document.getElementById('col-picker-wrap');
+    if (wrap && !wrap.contains(e.target)) {
+      document.getElementById('col-picker-panel').classList.remove('open');
+      document.getElementById('col-picker-btn').classList.remove('open');
+    }
+  });
 
   function applyFilters() {
     let rows = [...allRows];
@@ -872,14 +1054,6 @@
       rows = rows.filter(r =>
         Object.values(r).some(v => v.toLowerCase().includes(s))
       );
-    }
-
-    if (filterCol) {
-      rows = rows.filter(r => {
-        const aVal = r['A_' + filterCol] || '';
-        const bVal = r['B_' + filterCol] || '';
-        return aVal !== bVal;
-      });
     }
 
     // Apply column popup filters
@@ -912,13 +1086,15 @@
   function renderTable() {
     const start = (currentPage - 1) * pageSize;
     const pageRows = filteredRows.slice(start, start + pageSize);
+    const shownHeaders = visibleCols ? headers.filter(h => visibleCols.has(h)) : headers;
 
     // Build thead
     const thead = document.getElementById('thead');
     thead.innerHTML = '';
     const tr = document.createElement('tr');
 
-    headers.forEach((h, i) => {
+    shownHeaders.forEach((h) => {
+      const hi = headers.indexOf(h);
       const th = document.createElement('th');
       th.textContent = h;
       th.title = h;
@@ -929,12 +1105,12 @@
       else if (g === 'a') th.classList.add('a-col');
       else if (g === 'b') th.classList.add('b-col');
 
-      if (i === sortCol) { th.classList.add('sorted'); th.textContent += sortAsc ? ' ↑' : ' ↓'; }
+      if (hi === sortCol) { th.classList.add('sorted'); th.textContent += sortAsc ? ' ↑' : ' ↓'; }
       if (colFilters[h] && colFilters[h].size > 0) th.classList.add('has-filter');
 
       th.onclick = (e) => {
-        if (sortCol === i) sortAsc = !sortAsc;
-        else { sortCol = i; sortAsc = true; }
+        if (sortCol === hi) sortAsc = !sortAsc;
+        else { sortCol = hi; sortAsc = true; }
         filteredRows.sort((a, b) => {
           const va = a[h] || '';
           const vb = b[h] || '';
@@ -961,7 +1137,7 @@
     if (!pageRows.length) {
       const tr2 = document.createElement('tr');
       const td = document.createElement('td');
-      td.colSpan = headers.length;
+      td.colSpan = shownHeaders.length;
       td.innerHTML = '<div class="empty"><div class="icon">🔍</div><div>No matching rows</div></div>';
       tr2.appendChild(td);
       tbody.appendChild(tr2);
@@ -971,7 +1147,7 @@
     pageRows.forEach(row => {
       const tr2 = document.createElement('tr');
 
-      headers.forEach(h => {
+      shownHeaders.forEach(h => {
         const td = document.createElement('td');
         const g = getColGroup(h);
         const val = row[h] || '';
@@ -1252,6 +1428,31 @@
 
   // ---- End popup functions ----
 
+  function exportCSV() {
+    if (!filteredRows.length) return;
+    const exportHeaders = visibleCols ? headers.filter(h => visibleCols.has(h)) : headers;
+    const escapeCell = v => {
+      const s = String(v ?? '');
+      if (s.includes(',') || s.includes('"') || s.includes('\n'))
+        return '"' + s.replaceAll('"', '""') + '"';
+      return s;
+    };
+    const lines = [
+      exportHeaders.map(escapeCell).join(','),
+      ...filteredRows.map(row => exportHeaders.map(h => escapeCell(row[h] ?? '')).join(','))
+    ];
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `filtered_export_${new Date()
+            .toISOString()
+            .replace('T', '_')
+            .replaceAll(':', '-')
+            .slice(0, 19)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
   function loadCSV(text) {
     const { headers: hdrs, rows } = parseCSV(text);
     headers = hdrs;
@@ -1267,6 +1468,7 @@
     document.getElementById('drop-zone').style.display = 'none';
     document.getElementById('table-container').style.display = 'block';
     document.getElementById('controls').style.display = 'flex';
+    document.getElementById('export-btn').disabled = false;
 
     renderTable();
     renderPagination();
@@ -1312,11 +1514,6 @@
       searchTerm = e.target.value;
       applyFilters();
     }, 200);
-  });
-
-  document.getElementById('col-filter').addEventListener('change', e => {
-    filterCol = e.target.value;
-    applyFilters();
   });
 
   document.getElementById('only-diff').addEventListener('change', e => {

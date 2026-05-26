@@ -87,7 +87,9 @@ function normalizeArrayContent(content) {
   const checkStr = stripped || t;
   const parts = checkStr.split(/[,\n\t]+/).map(v => v.trim()).filter(Boolean);
   if (parts.length > 0 && parts.every(p => /^\d+$/.test(p))) {
-    return '[' + parts.join(', ') + ']';
+    // Quote entries with leading zeros — invalid as JSON number literals
+    const items = parts.map(p => (p.length > 1 && p.startsWith('0')) ? '"' + p + '"' : p);
+    return '[' + items.join(', ') + ']';
   }
   // Arbitrary text: escape and quote as a single string element.
   // Use ' JSON escape for ' so RE_SINGLE_QUOTED won't mistake it as a delimiter.
