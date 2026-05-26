@@ -81,7 +81,7 @@ const RE_CTRL_CHARS         = /[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
 function normalizeArrayContent(content) {
   const t = content.trim();
   if (!t) return '[]';
-  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(t)) return '[]';   // binary/junk
+  if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(t)) return '["__BINARY__"]';
   // Strip trailing extra ] before checking (handles [val]])
   const stripped = t.replace(/]+$/, '');
   const checkStr = stripped || t;
