@@ -71,6 +71,8 @@ const RE_DOUBLE_COMMA       = /,(\s*),/g;
 const RE_JANCODES_ARRAY     = /\bjanCodes=\[([\s\S]*?)](?=\s*,\s*[a-zA-Z])/g;
 const RE_JAN_SQ_FIELD       = /\bjan='([\d ,\t\r\n]+)'(?=\s*[,}])/g;
 const RE_CTRL_CHARS         = /[\x00-\x08\x0b\x0c\x0e-\x1f]/g;
+const RE_LOG_LEADING_PREFIX = /^(?:\\n|\n)\s*\w+:\s*/;
+const RE_LOG_RESPONSE_SEP   = /,\\n\s+responseBody:\s*|,\n\s+responseBody:\s*/;
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
@@ -152,6 +154,27 @@ function wrapScalarMulti(match, key, vals) {
     return '"' + val + '"';
   }).filter(function(val) { return val !== null; });
   return '"' + key + '":[' + parts.join(', ') + ']';
+}
+
+/**
+ * Xử lý log format: {requestParams},\n responseBody: {responseBody}
+ * Hỗ trợ cả escaped quotes (\" → ") và actual newline làm separator.
+ * @returns {string|null} JSON string nếu khớp, null nếu không
+ */
+function tryParseLogRequestResponse(s) {
+  // Strip optional leading "\n label: " prefix (e.g. "\n requestBody: ")
+  const normalized = s.replace(RE_LOG_LEADING_PREFIX, '');
+  const m = normalized.match(RE_LOG_RESPONSE_SEP);
+  if (!m) return null;
+  const sepIdx = normalized.indexOf(m[0]);
+  const unescape = str => str.replaceAll(String.raw`\"`, '"');
+  try {
+    const requestBody = JSON.parse(unescape(normalized.slice(0, sepIdx)));
+    const responseBody = JSON.parse(unescape(normalized.slice(sepIdx + m[0].length)));
+    return JSON.stringify({ requestBody, responseBody });
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -248,6 +271,9 @@ function wrapLeadingZeroOrSpacedVal(match) {
 function normalizeToJson(INPUT) {
   if (!INPUT || INPUT.trim() === '') return null;          // +1 (if) +1 (||)
   let s = INPUT.trim();
+
+  const logResult = tryParseLogRequestResponse(s);        // complexity moved to helper
+  if (logResult) return logResult;                        // +1
 
   const janResult = tryParseJanList(s);                   // complexity moved to helper
   if (janResult) return janResult;                        // +1
