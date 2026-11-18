@@ -1,6 +1,6 @@
 # DevToolkit
 
-A personal collection of developer tools for AWS, data, and shell scripting.
+A personal collection of developer tools for AWS, data, shell scripting, and CI/CD guides.
 
 ## Projects
 
@@ -18,6 +18,10 @@ A personal collection of developer tools for AWS, data, and shell scripting.
 ### Shell Scripts
 
 - **[Docker Monitor Daily Rotation](shell/docker_monitor_daily_rotation/)** - Bash script to monitor Docker container status, log output as JSON Lines, and auto-rotate logs daily with zip archiving. Designed to run via cron job.
+
+### Guides
+
+- **[Jenkins: Check Env (Secret File)](shell/jenkins-check-env.md)** - Guide to read the content of a Jenkins Secret file credential via Script Console (global or folder scope) without leaking it into build logs.
 
 ---
 
